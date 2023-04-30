@@ -1748,6 +1748,29 @@ Expect<uint32_t> WasiRandomGet::body(const Runtime::CallingFrame &Frame,
   return __WASI_ERRNO_SUCCESS;
 }
 
+Expect<uint32_t> WasiSum2::body(const Runtime::CallingFrame &Frame,
+                               uint32_t BufPtr) {
+  // int32_t BufPtr[]
+  // BufPtr[0] = BufPtr[0] + BufPtr[1];
+  // Check memory instance from module.
+  auto *MemInst = Frame.getMemoryByIndex(0);
+  if (MemInst == nullptr) {
+    return __WASI_ERRNO_FAULT;
+  }
+
+  const __wasi_size_t WasiBufLen = 2 * sizeof(int32_t);
+
+  auto *const Buf = MemInst->getPointer<int32_t *>(BufPtr, WasiBufLen);
+  if (unlikely(Buf == nullptr)) {
+    return __WASI_ERRNO_FAULT;
+  }
+
+  if (auto Res = Env.add2Get({Buf, WasiBufLen}); unlikely(!Res)) {
+    return Res.error();
+  }
+  return __WASI_ERRNO_SUCCESS;
+}
+
 Expect<uint32_t> WasiSockOpenV1::body(const Runtime::CallingFrame &Frame,
                                       uint32_t AddressFamily, uint32_t SockType,
                                       uint32_t /* Out */ RoFdPtr) {

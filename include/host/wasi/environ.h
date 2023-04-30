@@ -860,6 +860,17 @@ public:
     return {};
   }
 
+  WasiExpect<void> add2Get(Span<int32_t> Buffer) const noexcept {
+    auto BufferSpan = cxx20::as_writable_bytes(Buffer);
+    if (unlikely(BufferSpan.size() < 2 * sizeof(int32_t))) {
+      return WasiUnexpect(__WASI_ERRNO_FAULT);
+    }
+    auto a = reinterpret_cast<int32_t *>(&BufferSpan[0]);
+    auto b = reinterpret_cast<int32_t *>(&BufferSpan[sizeof(int32_t)]);
+    *a = *a + *b;
+    return {};
+  }
+
   WasiExpect<__wasi_fd_t> sockOpen(__wasi_address_family_t AddressFamily,
                                    __wasi_sock_type_t SockType) noexcept {
 

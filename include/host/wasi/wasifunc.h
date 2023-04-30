@@ -601,5 +601,12 @@ public:
                         uint32_t AddressPtr, uint32_t PortPtr);
 };
 
+class WasiSum2 : public Wasi<WasiSum2> {
+public:
+  WasiSum2(WASI::Environ &HostEnv) : Wasi(HostEnv) {}
+
+  Expect<uint32_t> body(const Runtime::CallingFrame &Frame, uint32_t BufPtr);
+};
+
 } // namespace Host
 } // namespace WasmEdge

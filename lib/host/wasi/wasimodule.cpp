@@ -61,6 +61,7 @@ WasiModule::WasiModule() : ModuleInstance("wasi_snapshot_preview1") {
   addHostFunc("proc_raise", std::make_unique<WasiProcRaise>(Env));
   addHostFunc("sched_yield", std::make_unique<WasiSchedYield>(Env));
   addHostFunc("random_get", std::make_unique<WasiRandomGet>(Env));
+  addHostFunc("sum2", std::make_unique<WasiSum2>(Env));
   // To make the socket API compatible with the old one,
   // we will duplicate all the API to V1 and V2.
   // The V1 presents the original behavior before 0.12 release.

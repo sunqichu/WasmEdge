@@ -30,6 +30,11 @@ void writeDummyMemoryContent(
   std::fill_n(MemInst.getPointer<uint8_t *>(0), 64, UINT8_C(0xa5));
 }
 
+void writeEmptyMemoryContent(
+    WasmEdge::Runtime::Instance::MemoryInstance &MemInst) noexcept {
+      std::fill_n(MemInst.getPointer<uint8_t *>(0), 64, UINT8_C(0x0));
+    }
+
 void writeString(WasmEdge::Runtime::Instance::MemoryInstance &MemInst,
                  std::string_view String, uint32_t Ptr) noexcept {
   std::copy(String.begin(), String.end(), MemInst.getPointer<uint8_t *>(Ptr));
@@ -2649,6 +2654,97 @@ TEST(WasiTest, Random) {
   EXPECT_TRUE(WasiRandomGet.run(
       CallFrame,
       std::initializer_list<WasmEdge::ValVariant>{UINT32_C(65536), UINT32_C(1)},
+      Errno));
+  EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_FAULT);
+  Env.fini();
+}
+
+TEST(WasiTest, Sum2) {
+  WasmEdge::Host::WASI::Environ Env;
+  std::array<WasmEdge::ValVariant, 1> Errno;
+  WasmEdge::Host::WasiSum2 WasiSum2Get(Env);
+
+  // invalid module
+  WasmEdge::Runtime::CallingFrame NullCallFrame(nullptr, nullptr);
+  Env.init({}, "test"s, {}, {});
+  EXPECT_TRUE(WasiSum2Get.run(
+      NullCallFrame,
+      std::initializer_list<WasmEdge::ValVariant>{UINT32_C(65536)},
+      Errno));
+  EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_FAULT);
+  Env.fini();
+
+  WasmEdge::Runtime::Instance::ModuleInstance Mod("");
+  Mod.addHostMemory(
+      "memory", std::make_unique<WasmEdge::Runtime::Instance::MemoryInstance>(
+                    WasmEdge::AST::MemoryType(1)));
+  auto *MemInstPtr = Mod.findMemoryExports("memory");
+  ASSERT_TRUE(MemInstPtr != nullptr);
+  auto &MemInst = *MemInstPtr;
+  WasmEdge::Runtime::CallingFrame CallFrame(nullptr, &Mod);
+  
+  writeEmptyMemoryContent(MemInst);
+  // valid pointer, pos + pos
+  Env.init({}, "test"s, {}, {});
+  *MemInst.getPointer<int32_t *>(0) = 0x3210333f;
+  *MemInst.getPointer<int32_t *>(sizeof(int32_t)) = 0x6f;
+  EXPECT_TRUE(WasiSum2Get.run(
+      CallFrame,
+      std::initializer_list<WasmEdge::ValVariant>{UINT32_C(0)},
+      Errno));
+  EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_SUCCESS);
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(0), INT32_C(0x321033ae));
+  // the second element value remain
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(sizeof(int32_t)), INT32_C(0x6f));
+  Env.fini();
+
+  // valid pointer, pos + neg
+  Env.init({}, "test"s, {}, {});
+  *MemInst.getPointer<int32_t *>(0) = 0x3210333f;
+  *MemInst.getPointer<int32_t *>(sizeof(int32_t)) = -0x2;
+  EXPECT_TRUE(WasiSum2Get.run(
+      CallFrame,
+      std::initializer_list<WasmEdge::ValVariant>{UINT32_C(0)},
+      Errno));
+  EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_SUCCESS);
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(0), INT32_C(0x3210333d));
+  // the second element value remain
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(sizeof(int32_t)), INT32_C(-0x2));
+  Env.fini();
+
+  // valid pointer, neg + pos
+  Env.init({}, "test"s, {}, {});
+  *MemInst.getPointer<int32_t *>(0) = -0x3;
+  *MemInst.getPointer<int32_t *>(sizeof(int32_t)) = 0x32103340;;
+  EXPECT_TRUE(WasiSum2Get.run(
+      CallFrame,
+      std::initializer_list<WasmEdge::ValVariant>{UINT32_C(0)},
+      Errno));
+  EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_SUCCESS);
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(0), INT32_C(0x3210333d));
+  // the second element value remain
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(sizeof(int32_t)), INT32_C(0x32103340));
+  Env.fini();
+
+  // valid pointer, neg + neg
+  Env.init({}, "test"s, {}, {});
+  *MemInst.getPointer<int32_t *>(0) = -0x3;
+  *MemInst.getPointer<int32_t *>(sizeof(int32_t)) = -0x40;;
+  EXPECT_TRUE(WasiSum2Get.run(
+      CallFrame,
+      std::initializer_list<WasmEdge::ValVariant>{UINT32_C(0)},
+      Errno));
+  EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_SUCCESS);
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(0), INT32_C(-0x43));
+  // the second element value remain
+  EXPECT_EQ(*MemInst.getPointer<const int32_t *>(sizeof(int32_t)), INT32_C(-0x40));
+  Env.fini();
+
+  // invalid pointer
+  Env.init({}, "test"s, {}, {});
+  EXPECT_TRUE(WasiSum2Get.run(
+      CallFrame,
+      std::initializer_list<WasmEdge::ValVariant>{UINT32_C(65536)},
       Errno));
   EXPECT_EQ(Errno[0].get<int32_t>(), __WASI_ERRNO_FAULT);
   Env.fini();
